@@ -107,25 +107,39 @@ class SQLiteMetadataStore:
         country_code: str,
         source_code: str,
         limit: int = 1000,
+        published_from_utc: Optional[datetime] = None,
+        published_to_utc: Optional[datetime] = None,
     ) -> list[sqlite3.Row]:
-        """Return discovery records that do not have any successful document version."""
+        """Return discovery records that do not have any successful document version.
+
+        If published_from_utc / published_to_utc are provided, the result is restricted
+        to that published_at_utc window.
+        """
+        sql = """
+        SELECT d.*
+        FROM discovery_records d
+        LEFT JOIN document_records r
+        ON r.discovery_id = d.discovery_id
+        AND r.download_status IN ('DOWNLOADED','DUPLICATE_SHA')
+        WHERE d.country_code = ?
+        AND d.source_code = ?
+        AND d.discovery_status = 'DISCOVERED'
+        AND r.document_id IS NULL
+        """
+        params: list[Any] = [country_code, source_code]
+
+        if published_from_utc is not None:
+            sql += " AND d.published_at_utc >= ?"
+            params.append(published_from_utc.isoformat())
+        if published_to_utc is not None:
+            sql += " AND d.published_at_utc <= ?"
+            params.append(published_to_utc.isoformat())
+
+        sql += " ORDER BY d.published_at_utc ASC LIMIT ?"
+        params.append(limit)
+
         with self.connect() as conn:
-            cur = conn.execute(
-                """
-                SELECT d.*
-                FROM discovery_records d
-                LEFT JOIN document_records r
-                  ON r.discovery_id = d.discovery_id
-                  AND r.download_status IN ('DOWNLOADED','DUPLICATE_SHA')
-                WHERE d.country_code = ?
-                  AND d.source_code = ?
-                  AND d.discovery_status = 'DISCOVERED'
-                  AND r.document_id IS NULL
-                ORDER BY d.published_at_utc ASC
-                LIMIT ?
-                """,
-                (country_code, source_code, limit),
-            )
+            cur = conn.execute(sql, params)
             return list(cur.fetchall())
 
     def get_latest_document_version(self, *, document_id: str) -> Optional[sqlite3.Row]:

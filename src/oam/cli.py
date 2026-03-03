@@ -7,7 +7,8 @@ from typing import Any, Optional
 
 import typer
 
-from oam.connectors import dummy as _dummy  # noqa: F401 (registers connector)
+from oam.connectors import dummy as _dummy 
+from oam.connectors import nl_afm_finrep as _nl_afm_finrep  # noqa: F401 (registers connector)# noqa: F401 (registers connector)
 from oam.connectors.registry import get_connector, list_connectors
 from oam.core.ids import new_crawl_run_id
 from oam.core.manifest import load_manifest
@@ -58,6 +59,11 @@ def cmd_run(
     root: Path = typer.Option(..., help="Root storage path"),
     limit: int = typer.Option(1000, help="Max downloads per run"),
     manifest: Optional[Path] = typer.Option(None, help="Path to country manifest YAML"),
+    download_ignore_window: bool = typer.Option(
+        False,
+        "--download-ignore-window",
+        help="If set, download will ignore --from/--to and drain the oldest pending backlog for this source.",
+    ),
 ) -> None:
     """Run discovery and/or download for a given country/source."""
 
@@ -123,6 +129,9 @@ def cmd_run(
                 paths=paths,
                 report=report,
                 limit=limit,
+                date_from=df,
+                date_to=dt,
+                ignore_date_window=download_ignore_window,
             )
 
         store.record_crawl_run_finish(crawl_run_id=crawl_run_id, finished_at_utc=now_utc())

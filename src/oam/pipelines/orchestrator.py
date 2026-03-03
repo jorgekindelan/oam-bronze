@@ -165,18 +165,42 @@ async def run_download(
     paths: RuntimePaths,
     report: RunReport,
     limit: int = 1000,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
+    ignore_date_window: bool = False,
 ) -> None:
     pending_rows = db.get_pending_downloads(
         country_code=connector.country_code,
         source_code=connector.source_code,
         limit=limit,
+        published_from_utc=None if ignore_date_window else date_from,
+        published_to_utc=None if ignore_date_window else date_to,
     )
+
     report.download_candidate_count = len(pending_rows)
 
-    for row in pending_rows:
+    for i, row in enumerate(pending_rows, start=1):
         discovery = _row_to_discovery(row)
+
+        # Progreso visible (muy útil con ZIPs grandes)
+        logger.info(
+            "download_progress",
+            extra={
+                "crawl_run_id": crawl_run_id,
+                "i": i,
+                "total": len(pending_rows),
+                "country": connector.country_code,
+                "source": connector.source_code,
+                "source_record_id_raw": discovery.source_record_id_raw,
+                "published_at_utc": str(discovery.published_at_utc),
+            },
+        )
+
         try:
-            doc_rec, content = await connector.download_document(crawl_run_id=crawl_run_id, discovery=discovery)
+            doc_rec, content = await connector.download_document(
+                crawl_run_id=crawl_run_id,
+                discovery=discovery,
+            )
 
             # Hash
             sha = sha256_bytes(content)
@@ -225,7 +249,7 @@ async def run_download(
             if inserted and doc_rec.download_status == "DOWNLOADED":
                 report.downloaded_count += 1
             elif doc_rec.download_status == "DUPLICATE_SHA":
-                # we count duplicates as successful downloads from a coverage perspective
+                # duplicates count as coverage-ok
                 pass
 
             db.insert_event(
@@ -254,7 +278,6 @@ async def run_download(
                 error_code="DOWNLOAD_EXCEPTION",
                 error_message=str(e),
             )
-
 
 def write_report(*, paths: RuntimePaths, report: RunReport) -> None:
     report.finished_at_utc = now_utc()

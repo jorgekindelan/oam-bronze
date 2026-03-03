@@ -1,2 +1,13 @@
-country_code: NL
-sources: []
+country_code: "NL"
+sources:
+  - source_code: "AFM_FINREP"
+    source_name: "AFM Register of financial reporting"
+    enabled: true
+    throttle_rps: 2.0
+    timeout_s: 60
+    headers:
+      User-Agent: "oam-bronze/0.1 (+https://github.com/jorgekindelan/oam-bronze)"
+    extra:
+      export_xml_url: "https://www.afm.nl/export.aspx?format=xml&type=e8825b05-4004-4301-b736-651e8c61053d"
+      detail_url_template: "https://www.afm.nl/en/sector/registers/meldingenregisters/financiele-verslaggeving/details?id={record_id}"
+      timezone: "Europe/Amsterdam"
