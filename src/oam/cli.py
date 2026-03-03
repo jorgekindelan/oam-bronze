@@ -8,7 +8,9 @@ from typing import Any, Optional
 import typer
 
 from oam.connectors import dummy as _dummy 
-from oam.connectors import nl_afm_finrep as _nl_afm_finrep  # noqa: F401 (registers connector)# noqa: F401 (registers connector)
+from oam.connectors import nl_afm_finrep as _nl_afm_finrep  
+from oam.connectors import nl_afm_issued_capital as _nl_afm_issued_capital 
+from oam.connectors import nl_afm_inside_info as _nl_afm_inside_info  # noqa: F401
 from oam.connectors.registry import get_connector, list_connectors
 from oam.core.ids import new_crawl_run_id
 from oam.core.manifest import load_manifest

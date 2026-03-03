@@ -11,3 +11,29 @@ sources:
       export_xml_url: "https://www.afm.nl/export.aspx?format=xml&type=e8825b05-4004-4301-b736-651e8c61053d"
       detail_url_template: "https://www.afm.nl/en/sector/registers/meldingenregisters/financiele-verslaggeving/details?id={record_id}"
       timezone: "Europe/Amsterdam"
+  - source_code: AFM_ISSUED_CAPITAL
+    source_name: "AFM Register issued capital (geplaatst kapitaal)"
+    enabled: true
+    throttle_rps: 2.0
+    timeout_s: 60
+    headers:
+      User-Agent: "oam-bronze/0.1 (+https://github.com/jorgekindelan/oam-bronze)"
+    extra:
+      register_url: "https://www.afm.nl/en/sector/registers/meldingenregisters/geplaatst-kapitaal"
+      export_csv_url: "https://www.afm.nl/export.aspx?format=csv&type=f25d2ca1-b93c-4331-b025-85df328cd505"
+      detail_url_template: "https://www.afm.nl/en/sector/registers/meldingenregisters/geplaatst-kapitaal/details?id={record_id}"
+      timezone: "Europe/Amsterdam"
+  - source_code: AFM_INSIDE_INFO
+    source_name: "AFM Register publication of inside information (openbaarmaking voorwetenschap)"
+    enabled: true
+    throttle_rps: 1.5
+    timeout_s: 60
+    headers:
+      User-Agent: "oam-bronze/0.1 (+https://github.com/jorgekindelan/oam-bronze)"
+    extra:
+      register_url: "https://www.afm.nl/en/sector/registers/meldingenregisters/openbaarmaking-voorwetenschap"
+      export_csv_url: "https://www.afm.nl/export.aspx?format=csv&type=fb94a1d1-ee14-4103-b6ca-02ad6ec9d8b6"
+      export_xml_url: "https://www.afm.nl/export.aspx?format=xml&type=fb94a1d1-ee14-4103-b6ca-02ad6ec9d8b6"
+      detail_url_template: "https://www.afm.nl/en/sector/registers/meldingenregisters/openbaarmaking-voorwetenschap/details?id={record_id}"
+      timezone: "Europe/Amsterdam"
+ 
