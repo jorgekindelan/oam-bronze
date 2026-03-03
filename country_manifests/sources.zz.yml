@@ -1,0 +1,9 @@
+country_code: "ZZ"
+sources:
+  - source_code: "DUMMY"
+    source_name: "Dummy Source"
+    enabled: true
+    throttle_rps: 5.0
+    timeout_s: 30
+    headers:
+      user-agent: "oam-bronze/0.1 (+local)"

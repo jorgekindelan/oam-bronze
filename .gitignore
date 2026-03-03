@@ -1,0 +1,20 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv/
+dist/
+build/
+*.egg-info/
+
+# runtime
+/data/
+*.sqlite
+*.db
+
+# OS
+.DS_Store
+Thumbs.db
