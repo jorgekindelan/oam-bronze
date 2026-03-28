@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from dataclasses import dataclass
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import Any, Generator, Optional
 
 from oam.core.ids import uuid7
 from oam.models.discovery import DiscoveryRecord
@@ -18,21 +18,72 @@ def _dt_iso(dt: Optional[datetime]) -> Optional[str]:
     return dt.isoformat()
 
 
-@dataclass
 class SQLiteMetadataStore:
-    db_path: Path
+    def __init__(self, db_path: Path) -> None:
+        self.db_path = db_path
+        self._conn: Optional[sqlite3.Connection] = None
+
+    # ── Connection management ─────────────────────────────────────────────────
 
     def connect(self) -> sqlite3.Connection:
+        """Open a fresh standalone connection (used by init_schema and as fallback)."""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys=ON")
         return conn
 
+    @contextmanager
+    def session(self) -> Generator[None, None, None]:
+        """Hold a single connection for the duration of a run.
+
+        All store methods called within this block reuse the same connection,
+        avoiding the open/close overhead of a new connection per operation.
+        Each method still commits individually for durability.
+        """
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys=ON")
+        self._conn = conn
+        try:
+            yield
+        finally:
+            conn.close()
+            self._conn = None
+
+    @contextmanager
+    def _get_conn(self) -> Generator[sqlite3.Connection, None, None]:
+        """Yield a connection, committing on success and rolling back on error.
+
+        Inside a session: reuses the session connection (no open/close).
+        Outside a session: creates a temporary connection, commits, and closes it.
+        """
+        if self._conn is not None:
+            with self._conn:
+                yield self._conn
+        else:
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys=ON")
+            try:
+                with conn:
+                    yield conn
+            finally:
+                conn.close()
+
+    # ── Schema ────────────────────────────────────────────────────────────────
+
     def init_schema(self) -> None:
         schema_path = Path(__file__).with_name("schema.sql")
         sql = schema_path.read_text(encoding="utf-8")
-        with self.connect() as conn:
+        # executescript always uses a standalone connection: it issues an implicit
+        # COMMIT before running, which must not happen on the session connection.
+        conn = self.connect()
+        try:
             conn.executescript(sql)
+        finally:
+            conn.close()
+
+    # ── Crawl runs ────────────────────────────────────────────────────────────
 
     def record_crawl_run_start(
         self,
@@ -42,25 +93,27 @@ class SQLiteMetadataStore:
         git_sha: Optional[str] = None,
         config_hash: Optional[str] = None,
     ) -> None:
-        with self.connect() as conn:
+        with self._get_conn() as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO crawl_runs(crawl_run_id, started_at_utc, git_sha, config_hash) VALUES (?, ?, ?, ?)",
                 (crawl_run_id, started_at_utc.isoformat(), git_sha, config_hash),
             )
 
     def record_crawl_run_finish(self, *, crawl_run_id: str, finished_at_utc: datetime) -> None:
-        with self.connect() as conn:
+        with self._get_conn() as conn:
             conn.execute(
                 "UPDATE crawl_runs SET finished_at_utc = ? WHERE crawl_run_id = ?",
                 (finished_at_utc.isoformat(), crawl_run_id),
             )
+
+    # ── Discovery ─────────────────────────────────────────────────────────────
 
     def insert_discovery(self, rec: DiscoveryRecord) -> bool:
         payload_json = None
         if rec.metadata_payload_raw is not None:
             payload_json = json.dumps(rec.metadata_payload_raw, ensure_ascii=False, default=str)
 
-        with self.connect() as conn:
+        with self._get_conn() as conn:
             cur = conn.execute(
                 """
                 INSERT OR IGNORE INTO discovery_records(
@@ -138,12 +191,14 @@ class SQLiteMetadataStore:
         sql += " ORDER BY d.published_at_utc ASC LIMIT ?"
         params.append(limit)
 
-        with self.connect() as conn:
+        with self._get_conn() as conn:
             cur = conn.execute(sql, params)
             return list(cur.fetchall())
 
+    # ── Documents ─────────────────────────────────────────────────────────────
+
     def get_latest_document_version(self, *, document_id: str) -> Optional[sqlite3.Row]:
-        with self.connect() as conn:
+        with self._get_conn() as conn:
             cur = conn.execute(
                 """
                 SELECT * FROM document_records
@@ -156,7 +211,7 @@ class SQLiteMetadataStore:
             return cur.fetchone()
 
     def find_by_sha256(self, *, sha256: str) -> Optional[sqlite3.Row]:
-        with self.connect() as conn:
+        with self._get_conn() as conn:
             cur = conn.execute(
                 """
                 SELECT * FROM document_records
@@ -169,7 +224,7 @@ class SQLiteMetadataStore:
             return cur.fetchone()
 
     def insert_document_version(self, rec: DocumentRecord) -> bool:
-        with self.connect() as conn:
+        with self._get_conn() as conn:
             cur = conn.execute(
                 """
                 INSERT OR IGNORE INTO document_records(
@@ -218,6 +273,8 @@ class SQLiteMetadataStore:
             )
             return cur.rowcount == 1
 
+    # ── Events ────────────────────────────────────────────────────────────────
+
     def insert_event(
         self,
         *,
@@ -235,7 +292,7 @@ class SQLiteMetadataStore:
         error_message: Optional[str] = None,
     ) -> None:
         event_id = str(uuid7())
-        with self.connect() as conn:
+        with self._get_conn() as conn:
             conn.execute(
                 """
                 INSERT INTO download_events(
@@ -260,6 +317,8 @@ class SQLiteMetadataStore:
                 ),
             )
 
+    # ── Checkpoints ───────────────────────────────────────────────────────────
+
     def upsert_checkpoint(
         self,
         *,
@@ -268,7 +327,7 @@ class SQLiteMetadataStore:
         state: dict[str, Any],
         updated_at_utc: datetime,
     ) -> None:
-        with self.connect() as conn:
+        with self._get_conn() as conn:
             conn.execute(
                 """
                 INSERT INTO checkpoints(country_code, source_code, state_json, updated_at_utc)
@@ -280,7 +339,7 @@ class SQLiteMetadataStore:
             )
 
     def load_checkpoint(self, *, country_code: str, source_code: str) -> Optional[dict[str, Any]]:
-        with self.connect() as conn:
+        with self._get_conn() as conn:
             cur = conn.execute(
                 "SELECT state_json FROM checkpoints WHERE country_code = ? AND source_code = ?",
                 (country_code, source_code),

@@ -1,20 +1,84 @@
+# ── Python ────────────────────────────────────────────────────────────────────
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-.mypy_cache/
-.pytest_cache/
-.ruff_cache/
-.venv/
-dist/
-build/
-*.egg-info/
+*.py[cod]
+*$py.class
+*.so
 
-# runtime
+# Distribution / packaging
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+MANIFEST
+
+# ── Virtual environments ───────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+.env
+
+# ── Type checkers / linters ───────────────────────────────────────────────────
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+dmypy.json
+
+# ── Test / coverage ───────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+
+# ── IDEs ──────────────────────────────────────────────────────────────────────
+.vscode/settings.json
+.vscode/launch.json
+.idea/
+*.swp
+*.swo
+*~
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ── Runtime data (oam-bronze) ─────────────────────────────────────────────────
+# Local crawl output: binaries, snapshots, reports, raw payloads
 /data/
+
+# SQLite metadata stores
 *.sqlite
+*.sqlite3
 *.db
 
-# OS
-.DS_Store
-Thumbs.db
+# Temporary download files
+*.tmp
+
+# ── Secrets / credentials ─────────────────────────────────────────────────────
+.env.local
+.env.*.local
+secrets/
+credentials.json
+*.pem
+*.key
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Jupyter ───────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── uv ────────────────────────────────────────────────────────────────────────
+# Keep uv.lock in version control; ignore the cache
+.uv/

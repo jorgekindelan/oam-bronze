@@ -50,7 +50,7 @@ class DocumentRecord(BaseModel):
 
     @field_validator("published_at_utc", "downloaded_at_utc")
     @classmethod
-    def _tz_aware(cls, v: datetime):
+    def _tz_aware(cls, v: Optional[datetime]) -> Optional[datetime]:
         if v is None:
             return v
         if v.tzinfo is None:

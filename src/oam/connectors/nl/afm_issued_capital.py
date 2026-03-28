@@ -5,17 +5,16 @@ from typing import Any, AsyncIterator, Optional
 from zoneinfo import ZoneInfo
 import asyncio
 
-import httpx
-
 from oam.connectors.base import BaseConnector
 from oam.connectors.registry import register
+from oam.core.http import build_async_client
 from oam.core.ids import make_ids
 from oam.core.logging import get_logger
 from oam.core.time import now_utc
 from oam.models.discovery import DiscoveryRecord
 from oam.models.document import DocumentRecord
 
-from oam.connectors.nl_afm_issued_capital_parsers import (
+from oam.connectors.nl.afm_issued_capital_parsers import (
     parse_list_page,
     parse_detail_page,
     parse_ui_date_dd_mmm_yyyy,
@@ -50,7 +49,10 @@ class NLAFMIssuedCapital(BaseConnector):
         checkpoint: Optional[dict[str, Any]],
     ) -> AsyncIterator[DiscoveryRecord]:
         extra = dict(self.config.get("extra", {}) or {})
-        register_url = str(extra["register_url"])
+        register_url = extra.get("register_url")
+        if not register_url:
+            raise ValueError("AFM_ISSUED_CAPITAL requires 'register_url' in extra config")
+        register_url = str(register_url)
         base_url = "https://www.afm.nl"
         tz = ZoneInfo(str(extra.get("timezone", "Europe/Amsterdam")))
 
@@ -61,7 +63,7 @@ class NLAFMIssuedCapital(BaseConnector):
         seen_pages: set[str] = set()
         queue: list[str] = [register_url]
 
-        async with httpx.AsyncClient(timeout=timeout_s, follow_redirects=True, headers=headers) as client:
+        async with build_async_client(timeout_s=timeout_s, headers=headers) as client:
             while queue:
                 page_url = queue.pop(0)
                 if page_url in seen_pages:
@@ -129,7 +131,7 @@ class NLAFMIssuedCapital(BaseConnector):
         headers.setdefault("User-Agent", "oam-bronze/0.1 (+https://github.com/jorgekindelan/oam-bronze)")
         timeout_s = int(self.config.get("timeout_s", 60))
 
-        async with httpx.AsyncClient(timeout=timeout_s, follow_redirects=True, headers=headers) as client:
+        async with build_async_client(timeout_s=timeout_s, headers=headers) as client:
             await self._throttle()
             r = await client.get(discovery.detail_url)
             r.raise_for_status()
@@ -175,5 +177,5 @@ class NLAFMIssuedCapital(BaseConnector):
                 error_message=None,
             )
 
-            # importante: preservamos el HTML crudo; parsed va en metadata del discovery 
+            # importante: preservamos el HTML crudo; parsed va en metadata del discovery
             return doc, html_bytes

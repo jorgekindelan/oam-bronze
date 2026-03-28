@@ -1,20 +1,21 @@
 from __future__ import annotations
 
+import io
+import zipfile
 from datetime import datetime
 from typing import Any, AsyncIterator, Optional
 from zoneinfo import ZoneInfo
 
-import httpx
-
 from oam.connectors.base import BaseConnector
 from oam.connectors.registry import register
+from oam.core.http import build_async_client
 from oam.core.ids import make_ids
 from oam.core.logging import get_logger
 from oam.core.time import now_utc
 from oam.models.discovery import DiscoveryRecord
 from oam.models.document import DocumentRecord
 
-from oam.connectors.nl_afm_finrep_parsers import (
+from oam.connectors.nl.afm_finrep_parsers import (
     extract_isin,
     extract_language,
     extract_lei,
@@ -65,7 +66,7 @@ class NLAFMFinRep(BaseConnector):
 
         timeout_s = int(self.config.get("timeout_s", 60))
 
-        async with httpx.AsyncClient(timeout=timeout_s, follow_redirects=True, headers=headers) as client:
+        async with build_async_client(timeout_s=timeout_s, headers=headers) as client:
             r = await client.get(export_url)
             r.raise_for_status()
 
@@ -85,7 +86,7 @@ class NLAFMFinRep(BaseConnector):
                 extra={"hits_total": len(hits), "hits_in_window": len(window_hits)},
             )
 
-            watermark: Optional[str] = None
+            watermark: Optional[str] = checkpoint.get("watermark_published_at_utc") if checkpoint else None
 
             for h in window_hits:
                 issuer = h.issuer_name_raw
@@ -105,7 +106,7 @@ class NLAFMFinRep(BaseConnector):
                     source_code=self.source_code,
                     source_record_id_raw=h.record_id,
                     detail_url=detail_url,
-                    download_url=None,  
+                    download_url=None,
                 )
 
                 title = f"{issuer}, {filing_type}" if issuer and filing_type else None
@@ -139,6 +140,10 @@ class NLAFMFinRep(BaseConnector):
                     discovery_status="DISCOVERED",
                 )
 
+                ts = h.published_at_utc.isoformat()
+                if watermark is None or ts > watermark:
+                    watermark = ts
+
             if checkpoint is not None and watermark is not None:
                 checkpoint["watermark_published_at_utc"] = watermark
 
@@ -155,7 +160,7 @@ class NLAFMFinRep(BaseConnector):
         )
         timeout_s = int(self.config.get("timeout_s", 60))
 
-        async with httpx.AsyncClient(timeout=timeout_s, follow_redirects=True, headers=headers) as client:
+        async with build_async_client(timeout_s=timeout_s, headers=headers) as client:
             # 1) detail page to resolve download url (and set cookies)
             d = await client.get(discovery.detail_url)
             d.raise_for_status()
@@ -187,6 +192,16 @@ class NLAFMFinRep(BaseConnector):
                     file_extension = "zip"
                 else:
                     file_extension = "bin"
+
+            # Decompress zip: extract the first member and use it instead
+            if file_extension == "zip" or ct in ("application/zip", "application/x-zip-compressed"):
+                with zipfile.ZipFile(io.BytesIO(content)) as zf:
+                    members = [m for m in zf.namelist() if not m.endswith("/")]
+                    if members:
+                        inner_name = members[0]
+                        content = zf.read(inner_name)
+                        file_extension = inner_name.rsplit(".", 1)[-1].lower().strip() if "." in inner_name else "bin"
+                        filename = inner_name
 
             ids = make_ids(
                 country_code=discovery.country_code,

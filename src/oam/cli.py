@@ -7,10 +7,8 @@ from typing import Any, Optional
 
 import typer
 
-from oam.connectors import dummy as _dummy 
-from oam.connectors import nl_afm_finrep as _nl_afm_finrep  
-from oam.connectors import nl_afm_issued_capital as _nl_afm_issued_capital 
-from oam.connectors import nl_afm_inside_info as _nl_afm_inside_info  # noqa: F401
+from oam.connectors import dummy as _dummy  # noqa: F401
+from oam.connectors import nl as _nl  # noqa: F401
 from oam.connectors.registry import get_connector, list_connectors
 from oam.core.ids import new_crawl_run_id
 from oam.core.manifest import load_manifest
@@ -75,7 +73,6 @@ def cmd_run(
 
         store = SQLiteMetadataStore(db)
         store.init_schema()
-        store.record_crawl_run_start(crawl_run_id=crawl_run_id, started_at_utc=started)
 
         obj_store = FilesystemStore(root)
         raw_store = RawPayloadStore(root)
@@ -110,35 +107,38 @@ def cmd_run(
         df = _parse_date(date_from, end_of_day=False)
         dt = _parse_date(date_to, end_of_day=True)
 
-        if mode in ("discover", "full"):
-            await run_discovery(
-                db=store,
-                raw_store=raw_store,
-                connector=connector,
-                crawl_run_id=crawl_run_id,
-                date_from=df,
-                date_to=dt,
-                paths=paths,
-                report=report,
-            )
+        with store.session():
+            store.record_crawl_run_start(crawl_run_id=crawl_run_id, started_at_utc=started)
 
-        if mode in ("download", "full"):
-            await run_download(
-                db=store,
-                obj_store=obj_store,
-                connector=connector,
-                crawl_run_id=crawl_run_id,
-                paths=paths,
-                report=report,
-                limit=limit,
-                date_from=df,
-                date_to=dt,
-                ignore_date_window=download_ignore_window,
-            )
+            if mode in ("discover", "full"):
+                await run_discovery(
+                    db=store,
+                    raw_store=raw_store,
+                    connector=connector,
+                    crawl_run_id=crawl_run_id,
+                    date_from=df,
+                    date_to=dt,
+                    paths=paths,
+                    report=report,
+                )
 
-        store.record_crawl_run_finish(crawl_run_id=crawl_run_id, finished_at_utc=now_utc())
+            if mode in ("download", "full"):
+                await run_download(
+                    db=store,
+                    obj_store=obj_store,
+                    connector=connector,
+                    crawl_run_id=crawl_run_id,
+                    paths=paths,
+                    report=report,
+                    limit=limit,
+                    date_from=df,
+                    date_to=dt,
+                    ignore_date_window=download_ignore_window,
+                )
+
+            store.record_crawl_run_finish(crawl_run_id=crawl_run_id, finished_at_utc=now_utc())
+
         write_report(paths=paths, report=report)
-
         typer.echo(f"OK: crawl_run_id={crawl_run_id}")
 
     asyncio.run(_run())

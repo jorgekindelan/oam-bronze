@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Mapping, Optional
 
+from oam.core.logging import get_logger
 from oam.core.text import slugify
 from oam.persistence.object_store import ObjectStore
+
+logger = get_logger("oam.persistence.filesystem")
 
 
 @dataclass(frozen=True)
@@ -45,8 +48,8 @@ class FilesystemStore(ObjectStore):
                 import json
 
                 meta_path.write_text(json.dumps(dict(metadata), ensure_ascii=False, indent=2), encoding="utf-8")
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("meta_write_failed", extra={"path": str(meta_path), "error": str(exc)})
 
 
 def build_binary_storage_key(
@@ -61,7 +64,7 @@ def build_binary_storage_key(
     # Partitioning chooses published_at when available; else falls back to current year/month bucket.
     dt = published_at_utc
     if dt is None:
-        dt = datetime.utcnow()
+        dt = datetime.now(tz=UTC)
     year = f"{dt.year:04d}"
     month = f"{dt.month:02d}"
     issuer_slug = slugify(issuer_name_raw or "unknown")
