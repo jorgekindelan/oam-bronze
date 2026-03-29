@@ -82,3 +82,5 @@ logs/
 # ── uv ────────────────────────────────────────────────────────────────────────
 # Keep uv.lock in version control; ignore the cache
 .uv/
+
+.claude/

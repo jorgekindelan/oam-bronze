@@ -9,6 +9,8 @@ import typer
 
 from oam.connectors import dummy as _dummy  # noqa: F401
 from oam.connectors import nl as _nl  # noqa: F401
+from oam.connectors import fr as _fr  # noqa: F401
+from oam.connectors import es as _es  # noqa: F401
 from oam.connectors.registry import get_connector, list_connectors
 from oam.core.ids import new_crawl_run_id
 from oam.core.manifest import load_manifest

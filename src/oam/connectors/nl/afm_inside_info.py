@@ -72,6 +72,7 @@ class NLAFMInsideInfo(BaseConnector):
 
             visited_ids: set[str] = set()
             in_window = False
+            watermark: Optional[str] = checkpoint.get("watermark_published_at_utc") if checkpoint else None
 
             while current_detail_url:
                 await self._throttle()
@@ -125,7 +126,7 @@ class NLAFMInsideInfo(BaseConnector):
                                 issuer_id_raw=None,
                                 isin=None,
                                 lei=None,
-                                filing_type_raw="inside_information",
+                                filing_type_raw="inside_information",  # System-assigned constant: AFM does not expose a per-record filing type on this register (type-homogeneous register).
                                 title_raw=f"{parsed.title_raw} | {dl.filename}",
                                 published_at_raw=parsed.published_at_raw,
                                 published_at_utc=parsed.published_at_utc,
@@ -143,7 +144,14 @@ class NLAFMInsideInfo(BaseConnector):
                                 discovery_status="DISCOVERED",
                             )
 
+                    ts = parsed.published_at_utc.isoformat()
+                    if watermark is None or ts > watermark:
+                        watermark = ts
+
                 current_detail_url = parsed.older_detail_url
+
+            if checkpoint is not None and watermark is not None:
+                checkpoint["watermark_published_at_utc"] = watermark
 
     async def download_document(
         self, *, crawl_run_id: str, discovery: DiscoveryRecord

@@ -56,7 +56,7 @@ def parse_list_page(html: str, *, base_url: str, tz: ZoneInfo) -> tuple[list[Lis
 
     rows: list[ListRow] = []
 
-    # Heurística: cualquier <a href="...details?id=..."> dentro de la tabla
+    # Heuristic: any <a href="...details?id=..."> inside the table
     for a in soup.find_all("a", href=True):
         href = a["href"]
         m = DETAIL_ID_RE.search(href)
@@ -65,21 +65,20 @@ def parse_list_page(html: str, *, base_url: str, tz: ZoneInfo) -> tuple[list[Lis
         record_id = m.group(1)
         detail_url = href if href.startswith("http") else base_url.rstrip("/") + href
 
-        # La fecha suele ser el texto del link (ej "27 feb 2026")
+        # The date is typically the link text (e.g. "27 feb 2026")
         date_raw = a.get_text(strip=True)
         try:
             date_utc = parse_ui_date_dd_mmm_yyyy(date_raw, tz=tz)
         except Exception:
-            # si el link no era el de fecha, ignora
+            # if the link text was not a date, skip it
             continue
 
-        # En la fila hay columnas: Date / Issuer / Place.
-        # Subimos a <tr> para extraer celdas.
+        # Row columns: Date / Issuer / Place — walk up to <tr> to extract cells
         tr = a.find_parent("tr")
         if not tr:
             continue
         tds = [td.get_text(" ", strip=True) for td in tr.find_all(["td", "th"])]
-        # Esperado: [date, issuer, place]
+        # Expected: [date, issuer, place]
         issuer = tds[1] if len(tds) >= 2 else None
         place = tds[2] if len(tds) >= 3 else None
         if not issuer:
@@ -96,7 +95,7 @@ def parse_list_page(html: str, *, base_url: str, tz: ZoneInfo) -> tuple[list[Lis
             )
         )
 
-    # Pagination: recoger hrefs que apunten a la misma página con algún parámetro (no adivinamos)
+    # Pagination: collect hrefs pointing to the same register with pagination parameters
     page_urls: set[str] = set()
     for a in soup.find_all("a", href=True):
         href = a["href"]
@@ -109,9 +108,9 @@ def parse_list_page(html: str, *, base_url: str, tz: ZoneInfo) -> tuple[list[Lis
 
 def _reconstruct_rows_if_needed(text: str) -> str:
     """
-    AFM CSV a veces viene con múltiples registros en una misma línea separados por:
+    AFM CSV sometimes contains multiple records on one line separated by:
       ..."0.00000" "2019-02-21 00:00:00";...
-    Insertamos saltos de línea antes de cada nuevo YYYY-MM-DD si está pegado.
+    Insert line breaks before each new YYYY-MM-DD when concatenated.
     """
     return re.sub(r'"\s+"(?=\d{4}-\d{2}-\d{2}\s)', '"\n"', text)
 

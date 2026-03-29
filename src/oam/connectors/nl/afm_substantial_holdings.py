@@ -62,6 +62,7 @@ class NLAFMSubstantialHoldings(BaseConnector):
         seen_pages: set[str] = set()
         page_url: Optional[str] = register_url
         pages_seen = 0
+        watermark: Optional[str] = checkpoint.get("watermark_published_at_utc") if checkpoint else None
 
         async with build_async_client(timeout_s=timeout_s, headers=headers) as client:
             while page_url:
@@ -114,7 +115,7 @@ class NLAFMSubstantialHoldings(BaseConnector):
                         issuer_id_raw=None,
                         isin=None,
                         lei=None,
-                        filing_type_raw="substantial_holdings_and_gross_short_positions",
+                        filing_type_raw="substantial_holdings_and_gross_short_positions",  # System-assigned constant: AFM does not expose a per-record filing type on this register (type-homogeneous register).
                         title_raw=h.notifier_raw,
                         published_at_raw=h.published_at_raw,
                         published_at_utc=h.published_at_utc,
@@ -131,11 +132,18 @@ class NLAFMSubstantialHoldings(BaseConnector):
                         discovery_status="DISCOVERED",
                     )
 
+                    ts = h.published_at_utc.isoformat()
+                    if watermark is None or ts > watermark:
+                        watermark = ts
+
                 if oldest_on_page < date_from:
                     logger.info("stop_by_date_from", extra={"page_url": page_url, "oldest": oldest_on_page.isoformat()})
                     break
 
                 page_url = next_page_url
+
+            if checkpoint is not None and watermark is not None:
+                checkpoint["watermark_published_at_utc"] = watermark
 
     async def download_document(
         self, *, crawl_run_id: str, discovery: DiscoveryRecord

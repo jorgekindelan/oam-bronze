@@ -10,7 +10,7 @@ import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup
 
 
-# Regex fallback por si AFM cambia el formato (mantener resiliencia)
+# Regex fallback in case AFM changes the export format (maintain resilience)
 EXPORT_HEADER_RE = re.compile(
     r"\b(?P<id>(?:A\d{4}-\d{5})|\d+)\s+"
     r"(?P<date>\d{1,2}/\d{1,2}/\d{4})\s+"
@@ -176,6 +176,28 @@ def parse_detail_html(detail_html: str, *, base_url: str = "https://www.afm.nl")
         "document_filename_raw": filename,
         "download_url": download_url,
     }
+
+
+def extract_issuer_id(lei: Optional[str]) -> Optional[str]:
+    """
+    Return the best available stable issuer identifier for NL AFM financial reports.
+    Uses LEI with 'LEI:' prefix when available.
+
+    NOTE: ISIN is NOT used here because AFM finrep export filenames do not reliably
+    contain ISINs — the ISIN regex can produce false positives from LEI substrings.
+    ISIN is preserved separately in DiscoveryRecord.isin via extract_isin().
+
+    NL structural characteristic established at baseline (2024). FR uses the same
+    LEI: prefix convention in extract_issuer_id() with an additional ISIN-first
+    priority, which is possible because FR's API provides ISIN as a separate verified
+    field. AFM does not provide a separate verified ISIN field in the export.
+
+    Returns:
+        'LEI:{lei}' if LEI is available, else None.
+    """
+    if lei and lei.strip():
+        return f"LEI:{lei.strip()}"
+    return None
 
 
 def extract_lei(text: Optional[str]) -> Optional[str]:

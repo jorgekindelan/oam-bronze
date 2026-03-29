@@ -1,2 +1,71 @@
-country_code: FR
-sources: []
+country_code: "FR"
+sources:
+  - source_code: "INFOFIN_FINREP"
+    source_name: "AMF / info-financiere.gouv.fr — Rapports financiers annuels"
+    enabled: true
+    throttle_rps: 3.0
+    timeout_s: 60
+    headers:
+      User-Agent: "oam-bronze/0.1 (+https://github.com/jorgekindelan/oam-bronze)"
+      Accept: "application/json"
+    extra:
+      api_base_url: "https://www.info-financiere.gouv.fr/api/explore/v2.1/catalog/datasets/flux-amf-new-prod/records"
+      where_clause: "sous_type_d_information=\"Rapports financiers et d'audit annuels\""
+      page_limit: 100
+      order_by: "uin_dat_amf ASC"
+
+  - source_code: "INFOFIN_HALFREP"
+    source_name: "AMF / info-financiere.gouv.fr — Rapports financiers semestriels"
+    enabled: true
+    throttle_rps: 3.0
+    timeout_s: 60
+    headers:
+      User-Agent: "oam-bronze/0.1 (+https://github.com/jorgekindelan/oam-bronze)"
+      Accept: "application/json"
+    extra:
+      api_base_url: "https://www.info-financiere.gouv.fr/api/explore/v2.1/catalog/datasets/flux-amf-new-prod/records"
+      where_clause: "sous_type_d_information=\"Rapports financiers et d'audit semestriels/examens réduits\""
+      page_limit: 100
+      order_by: "uin_dat_amf ASC"
+
+  - source_code: "INFOFIN_INSIDE_INFO"
+    source_name: "AMF / info-financiere.gouv.fr — Informations privilégiées"
+    enabled: true
+    throttle_rps: 2.0
+    timeout_s: 60
+    headers:
+      User-Agent: "oam-bronze/0.1 (+https://github.com/jorgekindelan/oam-bronze)"
+      Accept: "application/json"
+    extra:
+      api_base_url: "https://www.info-financiere.gouv.fr/api/explore/v2.1/catalog/datasets/flux-amf-new-prod/records"
+      where_clause: "sous_type_d_information=\"Informations privilégiées\""
+      page_limit: 100
+      order_by: "uin_dat_amf ASC"
+
+  - source_code: "INFOFIN_MAJOR_HOLDINGS"
+    source_name: "AMF / info-financiere.gouv.fr — Franchissements de seuil"
+    enabled: true
+    throttle_rps: 3.0
+    timeout_s: 60
+    headers:
+      User-Agent: "oam-bronze/0.1 (+https://github.com/jorgekindelan/oam-bronze)"
+      Accept: "application/json"
+    extra:
+      api_base_url: "https://www.info-financiere.gouv.fr/api/explore/v2.1/catalog/datasets/flux-amf-new-prod/records"
+      where_clause: "sous_type_d_information=\"Décision de franchissement de seuil\""
+      page_limit: 100
+      order_by: "uin_dat_amf ASC"
+
+  - source_code: "INFOFIN_VOTING_RIGHTS"
+    source_name: "AMF / info-financiere.gouv.fr — Droits de vote et capital"
+    enabled: true
+    throttle_rps: 3.0
+    timeout_s: 60
+    headers:
+      User-Agent: "oam-bronze/0.1 (+https://github.com/jorgekindelan/oam-bronze)"
+      Accept: "application/json"
+    extra:
+      api_base_url: "https://www.info-financiere.gouv.fr/api/explore/v2.1/catalog/datasets/flux-amf-new-prod/records"
+      where_clause: "sous_type_d_information=\"Total du nombre de droits de vote et du capital\" OR sous_type_d_information=\"Vie du titre (modifications des droits attachés aux actions, \u2026)\" OR sous_type_d_information=\"Modification des droits attachés aux catégories d'actions\""
+      page_limit: 100
+      order_by: "uin_dat_amf ASC"

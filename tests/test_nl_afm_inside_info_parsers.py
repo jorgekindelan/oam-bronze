@@ -1,9 +1,9 @@
 from zoneinfo import ZoneInfo
 
-from oam.connectors.nl_afm_inside_info_parsers import (
+from oam.connectors.nl.afm_inside_info_parsers import (
     parse_publication_dt,
     parse_list_page,
-    parse_detail_html,
+    parse_detail_page,
 )
 
 
@@ -26,7 +26,8 @@ def test_parse_list_page_extracts_rows():
       </table>
     </body></html>
     """
-    hits, next_page = parse_list_page(html, base_url="https://www.afm.nl", source_tz=ZoneInfo("Europe/Amsterdam"))
+    # parse_list_page returns list[ListHit], not a tuple
+    hits = parse_list_page(html, base_url="https://www.afm.nl", source_tz=ZoneInfo("Europe/Amsterdam"))
     assert len(hits) == 1
     assert hits[0].record_id == "C2603-00103"
     assert hits[0].issuer_name_raw == "ING Groep N.V."
@@ -34,7 +35,7 @@ def test_parse_list_page_extracts_rows():
     assert hits[0].detail_url.startswith("https://www.afm.nl/")
 
 
-def test_parse_detail_html_extracts_download():
+def test_parse_detail_page_extracts_downloads():
     html = """
     <html><body>
       <h1>ING Groep N.V.</h1>
@@ -47,10 +48,17 @@ def test_parse_detail_html_extracts_download():
 </a>
     </body></html>
     """
-    d = parse_detail_html(html, base_url="https://www.afm.nl")
-    assert d["issuer_name_raw"] == "ING Groep N.V."
-    assert "share repurchase" in (d["title_raw"] or "")
-    downloads = d["related_downloads"]
+    # parse_detail_page returns a DetailParsed dataclass (not a dict)
+    d = parse_detail_page(
+        html,
+        detail_url="https://www.afm.nl/en/sector/registers/meldingenregisters/openbaarmaking-voorwetenschap/details?id=C2603-00103",
+        base_url="https://www.afm.nl",
+        source_tz=ZoneInfo("Europe/Amsterdam"),
+    )
+    assert d.issuer_name_raw == "ING Groep N.V."
+    assert "share repurchase" in (d.title_raw or "")
+    # downloads field (not related_downloads)
+    downloads = d.downloads
     assert len(downloads) == 1
     assert downloads[0].filename.endswith(".pdf")
     assert downloads[0].href.startswith("https://www.afm.nl/downloadregisterfile.aspx")

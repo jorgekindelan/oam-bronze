@@ -62,6 +62,7 @@ class NLAFMIssuedCapital(BaseConnector):
 
         seen_pages: set[str] = set()
         queue: list[str] = [register_url]
+        watermark: Optional[str] = checkpoint.get("watermark_published_at_utc") if checkpoint else None
 
         async with build_async_client(timeout_s=timeout_s, headers=headers) as client:
             while queue:
@@ -75,12 +76,12 @@ class NLAFMIssuedCapital(BaseConnector):
                 r.raise_for_status()
 
                 rows, page_urls = parse_list_page(r.text, base_url=base_url, tz=tz)
-                # Encolar páginas descubiertas (paginación)
+                # Enqueue discovered page URLs (pagination)
                 for u in page_urls:
                     if u not in seen_pages:
                         queue.append(u)
 
-                # Procesar filas
+                # Process rows
                 for row in rows:
                     if not (date_from <= row.date_utc <= date_to):
                         continue
@@ -101,10 +102,10 @@ class NLAFMIssuedCapital(BaseConnector):
                         source_name=self.source_name,
                         source_record_id_raw=row.record_id,
                         issuer_name_raw=row.issuer_name_raw,
-                        issuer_id_raw=None,  # kvk viene en detail
-                        isin=None,  # ISINs se extraen en download
+                        issuer_id_raw=None,  # KvK (Chamber of Commerce number) is only available on the detail page
+                        isin=None,  # ISINs are extracted during the download step from the detail page
                         lei=None,
-                        filing_type_raw="issued_capital",
+                        filing_type_raw="issued_capital",  # System-assigned constant: AFM does not expose a per-record filing type on this register (type-homogeneous register).
                         title_raw=f"{row.issuer_name_raw} - issued capital",
                         published_at_raw=row.date_raw,
                         published_at_utc=row.date_utc,
@@ -120,6 +121,13 @@ class NLAFMIssuedCapital(BaseConnector):
                         discovered_at_utc=now_utc(),
                         discovery_status="DISCOVERED",
                     )
+
+                    ts = row.date_utc.isoformat()
+                    if watermark is None or ts > watermark:
+                        watermark = ts
+
+            if checkpoint is not None and watermark is not None:
+                checkpoint["watermark_published_at_utc"] = watermark
 
     async def download_document(
         self, *, crawl_run_id: str, discovery: DiscoveryRecord
@@ -154,7 +162,7 @@ class NLAFMIssuedCapital(BaseConnector):
                 country_code=discovery.country_code,
                 source_code=discovery.source_code,
                 issuer_name_raw=parsed.get("issuer_name_raw") or discovery.issuer_name_raw,
-                isin=",".join(parsed.get("isins") or []) or None,  # bronce: puedes dejarlo raw string
+                isin=",".join(parsed.get("isins") or []) or None,  # bronze: stored as raw comma-separated string; multiple ISINs per issued capital record is an AFM-specific characteristic
                 lei=None,
                 filing_type_raw=discovery.filing_type_raw,
                 title_raw=discovery.title_raw,
@@ -177,5 +185,5 @@ class NLAFMIssuedCapital(BaseConnector):
                 error_message=None,
             )
 
-            # importante: preservamos el HTML crudo; parsed va en metadata del discovery
+            # Important: we preserve the raw HTML as the document body; parsed fields go in discovery metadata
             return doc, html_bytes

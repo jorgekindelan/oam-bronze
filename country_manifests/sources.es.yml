@@ -1,0 +1,85 @@
+country_code: "ES"
+sources:
+  # B1 — Annual Financial Reports (DEFERRED — Phase 2)
+  # CNMV IFA portal is entity-based only; no date-range endpoint exists.
+  # Implementing B1 requires Phase 2 entity-iteration design.
+  # source_code CNMV_IFA is reserved but unimplemented.
+
+  # B2 — Half-yearly / Quarterly Financial Reports
+  - source_code: "CNMV_IFI"
+    source_name: "CNMV Informes Financieros Intermedios (IFI)"
+    enabled: true
+    throttle_rps: 1.5
+    timeout_s: 60
+    headers:
+      User-Agent: "oam-bronze/0.1 (+https://github.com/jorgekindelan/oam-bronze)"
+    extra:
+      list_url_template: "https://www.cnmv.es/portal/consultas/ifi/listaifi?fechaDesde={date_from}&fechaHasta={date_to}"
+      detail_url_template: "https://www.cnmv.es/portal/aldia/detalleifialdia.aspx?nreg={nreg}"
+      timezone: "Europe/Madrid"
+
+  # B3 — Inside information (post-08/02/2020)
+  - source_code: "CNMV_IP"
+    source_name: "CNMV Información Privilegiada (post-08/02/2020)"
+    enabled: true
+    throttle_rps: 1.5
+    timeout_s: 60
+    headers:
+      User-Agent: "oam-bronze/0.1 (+https://github.com/jorgekindelan/oam-bronze)"
+    extra:
+      results_url_template: "https://www.cnmv.es/portal/Informacion-Privilegiada/resultado-ip.aspx?fechaDesde={date_from}&fechaHasta={date_to}&page={page}"
+      ip_start_date: "08/02/2020"
+      timezone: "Europe/Madrid"
+
+  # B3 — Inside information / Hechos Relevantes (pre-08/02/2020 ONLY)
+  # OPEN RISK RISK-ES-03: HR tipo taxonomy covers only 5 of 60+ tipos.
+  # Full enumeration required before committing historical backfill.
+  - source_code: "CNMV_HR"
+    source_name: "CNMV Hechos Relevantes (pre-08/02/2020)"
+    enabled: true
+    throttle_rps: 1.0
+    timeout_s: 60
+    headers:
+      User-Agent: "oam-bronze/0.1 (+https://github.com/jorgekindelan/oam-bronze)"
+    extra:
+      form_url: "https://www.cnmv.es/portal/hr/busquedahr.aspx?division=3"
+      hr_max_date: "08/02/2020"
+      timezone: "Europe/Madrid"
+      # TODO: Verify tipo checkbox indices against a live form GET before each backfill
+      # Indices below are 0-based offset within lstTipos2 (observed 2024):
+      #   40 = Información sobre resultados
+      #   46 = Información financiera intermedia
+      #   49 = Resolución procesos judiciales o administrativos
+      #   51 = Otros sobre negocio y situación financiera
+      #   55 = Transmisiones y adquisiciones de participaciones societarias (AMBIGUOUS B3/B4)
+      tipo_indices: [40, 46, 49, 51, 55]
+
+  # B4 — Major Holdings / Participaciones Significativas
+  # OPEN RISK RISK-ES-01: VIEWSTATE may require JS rendering (Playwright).
+  # OPEN RISK RISK-ES-03: verdocumento e= tokens may expire between discover and download.
+  - source_code: "CNMV_PS"
+    source_name: "CNMV Participaciones Significativas (major holdings)"
+    enabled: true
+    throttle_rps: 1.0
+    timeout_s: 60
+    headers:
+      User-Agent: "oam-bronze/0.1 (+https://github.com/jorgekindelan/oam-bronze)"
+    extra:
+      form_url: "https://www.cnmv.es/portal/Consultas/MayoresParticipaciones/Busqueda.aspx"
+      timezone: "Europe/Madrid"
+
+  # B5 — Voting Rights / Capital Changes (tipoinf 8 and 9)
+  - source_code: "CNMV_OIRC"
+    source_name: "CNMV Derechos de Voto y Capital (OIRC tipoinf 8+9)"
+    enabled: true
+    throttle_rps: 1.5
+    timeout_s: 60
+    headers:
+      User-Agent: "oam-bronze/0.1 (+https://github.com/jorgekindelan/oam-bronze)"
+    extra:
+      results_url_template: "https://www.cnmv.es/Portal/Otra-Informacion-Regulada-Corporativa/Derechos-Voto-Capital.aspx?tipoinf={tipoinf}&fechaDesde={date_from}&fechaHasta={date_to}&page={page}"
+      tipoinf_codes: [8, 9]
+      # tipoinf 8: Total derechos voto y capital
+      # tipoinf 9: Cambios en derechos vinculados a valores
+      # All other tipoinf codes (10-29) are explicitly excluded in Phase 1.
+      timezone: "Europe/Madrid"

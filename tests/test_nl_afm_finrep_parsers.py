@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from zoneinfo import ZoneInfo
 
-from oam.connectors.nl_afm_finrep_parsers import (
+from oam.connectors.nl.afm_finrep_parsers import (
     extract_isin,
     extract_language,
     extract_lei,

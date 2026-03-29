@@ -17,6 +17,7 @@ from oam.models.document import DocumentRecord
 
 from oam.connectors.nl.afm_finrep_parsers import (
     extract_isin,
+    extract_issuer_id,
     extract_language,
     extract_lei,
     extract_period_end,
@@ -29,6 +30,30 @@ DEFAULT_EXPORT_XML_URL = "https://www.afm.nl/export.aspx?format=xml&type=e8825b0
 DEFAULT_DETAIL_URL_TEMPLATE = (
     "https://www.afm.nl/en/sector/registers/meldingenregisters/financiele-verslaggeving/details?id={record_id}"
 )
+
+# ─────────────────────────────────────────────────────────────────────────────
+# NL structural pattern — established as baseline (2024).
+# Subsequent country connectors (FR 2026) follow the same discover/download
+# separation and checkpoint pattern where their source allows. Where FR
+# differs from NL, the difference is documented in the FR connector.
+#
+# NL-specific characteristics:
+#   1. Two-stage download: AFM XML export (discovery) → detail HTML page
+#      (download URL resolution). AFM does not expose download URLs in the
+#      export. FR deviates: FR's API provides url_de_recuperation directly.
+#   2. Bulk XML export, date-window filtered in memory (no server-side
+#      pagination). FR uses paginated JSON API with server-side date filtering.
+#   3. Watermark key: 'watermark_published_at_utc' — generic, consistent across
+#      all four NL connectors. FR uses a source-specific field name
+#      ('watermark_uin_dat_amf') because the AMF API field is named that way.
+#   4. issuer_id_raw uses LEI only (not ISIN) because ISIN is not reliably
+#      present in AFM export filenames — the ISIN regex can produce false
+#      positives from LEI character substrings. ISIN is preserved separately
+#      in DiscoveryRecord.isin via extract_isin(). FR uses ISIN-first priority
+#      because FR's API provides a separate, verified ISIN field.
+#   5. Bucket 2 (Half-Yearly) is not present: AFM does not maintain a
+#      separate half-yearly reporting register. Documented gap, not an omission.
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 @register
@@ -96,6 +121,7 @@ class NLAFMFinRep(BaseConnector):
 
                 lei = extract_lei(filename) or extract_lei(h.raw_chunk)
                 isin = extract_isin(filename) or extract_isin(h.raw_chunk)
+                issuer_id = extract_issuer_id(lei)
                 lang = extract_language(filename)
                 period_end_raw, period_end_date = extract_period_end(filename)
 
@@ -119,6 +145,7 @@ class NLAFMFinRep(BaseConnector):
                     source_name=self.source_name,
                     source_record_id_raw=h.record_id,
                     issuer_name_raw=issuer,
+                    issuer_id_raw=issuer_id,
                     isin=isin,
                     lei=lei,
                     filing_type_raw=filing_type,
