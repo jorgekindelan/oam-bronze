@@ -34,8 +34,7 @@ htmlcov/
 .tox/
 
 # ── IDEs ──────────────────────────────────────────────────────────────────────
-.vscode/settings.json
-.vscode/launch.json
+.vscode/
 .idea/
 *.swp
 *.swo
@@ -93,6 +92,9 @@ harden_oam_claude_country_team.sh
 setup_oam_claude_team.sh
 oam_claude_team_guide.md
 scripts/run_country_agent.py
+
+# Investigation / probe scripts (one-off, not part of the project)
+scripts/*_probe.py
 
 # ── Docs (auto-generated / agent-produced) ────────────────────────────────────
 docs/
