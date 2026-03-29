@@ -83,4 +83,16 @@ logs/
 # Keep uv.lock in version control; ignore the cache
 .uv/
 
+# ── Claude Code / AI agents ───────────────────────────────────────────────────
 .claude/
+.mcp.json
+.mcp.json.example
+
+# Agent scaffolding scripts
+harden_oam_claude_country_team.sh
+setup_oam_claude_team.sh
+oam_claude_team_guide.md
+scripts/run_country_agent.py
+
+# ── Docs (auto-generated / agent-produced) ────────────────────────────────────
+docs/
